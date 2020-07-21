@@ -2,6 +2,8 @@
 #
 # Mount partitions from a disk image
 #
+# Requirements: partx, losetup
+#
 
 img=$1
 mountPrefix=${2:-"/mnt"}
