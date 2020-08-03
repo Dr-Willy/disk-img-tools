@@ -21,7 +21,7 @@ check_requirements () {
 }
 
 usage () {
-    echo "$0 [-h] [--ro] [-p <part_id>] <image_file> <mount_point>"
+    echo "$0 [-h] [--ro] [-p <part_id>] [-o|--overlay] <image_file> <mount_point>"
     exit 1
 }
 
@@ -32,7 +32,7 @@ if [[ $# -lt 2 ]]; then
     exit 1
 fi
 
-args=$(getopt -o "hp:" --long "ro" -n $0 -- $@)
+args=$(getopt -o "hp:o" --long "ro,overlay" -n $0 -- $@)
 eval set -- "$args"
 
 while true; do
@@ -44,13 +44,17 @@ while true; do
             partId=$2
             shift 2;;
         --ro)
-            mountOption="$mountOption,ro"
+            mountOption=",ro"
+            shift;;
+        --overlay|-o)
+            overlay=1
+            mountOption=",ro"
             shift;;
         --)
             shift
             break;;
         *)
-            echo "unrecgnise argument: $1"
+            echo "unrecognised argument: $1"
             exit 1;;
     esac
 done
@@ -83,9 +87,24 @@ for i in $partToMount; do
     if [ ! -d $mountPoint ]; then
         mkdir $mountPoint
     fi
+    loopOptions="loop,offset=${offset},sizelimit=${sizeLimit}${mountOption}"
 
-    #mount $img $mountPoint -o loop,offset=${offset},sizelimit=${sizeLimit}
-    mount $img $mountPoint -o loop,offset=${offset},sizelimit=${sizeLimit}${mountOption}
+    if [ -v overlay ]; then
+        lower=${mountPoint}/lower
+        upper=${mountPoint}/upper
+        workdir=${mountPoint}/workdir
+        merged=${mountPoint}/merged
+        for d in $lower $upper $workdir $merged; do
+            if [ ! -d $d ]; then
+                mkdir $d
+            fi
+        done
+        mount ${img} $lower -o $loopOptions
+        overlayOptions="lowerdir=$lower,upperdir=$upper,workdir=$workdir"
+        mount -t overlay -o $overlayOptions none $merged
+    else
+        mount $img $mountPoint -o ${loopOptions}
+    fi
 
 done
 
